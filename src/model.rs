@@ -303,6 +303,8 @@ pub struct TickSub {
 /// 逐笔成交数据
 #[derive(Debug, Clone, Default)]
 pub struct L2Order {
+    /// 合约代码（协议本身不带，由各数据源从附加字段回填）
+    pub code: StockCode,
     /// 顺序号 "1"
     pub seq: i64,
     /// 挂单时间 "56"
