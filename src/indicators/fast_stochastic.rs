@@ -1,0 +1,111 @@
+use std::fmt;
+
+use crate::errors::Result;
+use crate::indicators::{Maximum, Minimum};
+use crate::{Close, High, Low, Next, Period, Reset};
+
+/// Fast stochastic oscillator.
+///
+/// The stochastic oscillator is a momentum indicator comparing the closing price
+/// of a security to the range of its prices over a certain period of time.
+///
+/// # Formula
+///
+/// ![Fast stochastic oscillator formula](https://wikimedia.org/api/rest_v1/media/math/render/svg/5a419041034a8044308c999f85661a08bcf91b1d)
+///
+/// Where:
+///
+/// * \%K<sub>t</sub> - value of fast stochastic oscillator
+/// * C<sub>t</sub> - close price of the current period
+/// * L<sub>n</sub> - lowest price for the last _n_ periods
+/// * H<sub>n</sub> - highest price for the last _n_ periods
+///
+///
+/// # Parameters
+///
+/// * _period_ - number of periods (integer greater than 0). Default is 14.
+///
+/// # Example
+///
+/// ```
+/// use base::indicators::FastStochastic;
+/// use base::Next;
+///
+/// let mut stoch = FastStochastic::new(5).unwrap();
+/// assert_eq!(stoch.next(20.0), 50.0);
+/// assert_eq!(stoch.next(30.0), 100.0);
+/// assert_eq!(stoch.next(40.0), 100.0);
+/// assert_eq!(stoch.next(35.0), 75.0);
+/// assert_eq!(stoch.next(15.0), 0.0);
+/// ```
+#[derive(Debug, Clone)]
+pub struct FastStochastic {
+    period: usize,
+    minimum: Minimum,
+    maximum: Maximum,
+}
+
+impl FastStochastic {
+    pub fn new(period: usize) -> Result<Self> {
+        Ok(Self { period, minimum: Minimum::new(period)?, maximum: Maximum::new(period)? })
+    }
+}
+
+impl Period for FastStochastic {
+    fn period(&self) -> usize {
+        self.period
+    }
+}
+
+impl Next<f64> for FastStochastic {
+    type Output = f64;
+
+    fn next(&mut self, input: f64) -> Self::Output {
+        let min = self.minimum.next(input);
+        let max = self.maximum.next(input);
+
+        if min == max {
+            // When only 1 input was given, than min and max are the same,
+            // therefore it makes sense to return 50
+            50.0
+        } else {
+            (input - min) / (max - min) * 100.0
+        }
+    }
+}
+
+impl<T: High + Low + Close> Next<&T> for FastStochastic {
+    type Output = f64;
+
+    fn next(&mut self, input: &T) -> Self::Output {
+        let highest = self.maximum.next(input.high());
+        let lowest = self.minimum.next(input.low());
+        let close = input.close();
+
+        if highest == lowest {
+            // To avoid division by zero, return 50.0
+            50.0
+        } else {
+            (close - lowest) / (highest - lowest) * 100.0
+        }
+    }
+}
+
+impl Reset for FastStochastic {
+    fn reset(&mut self) {
+        self.minimum.reset();
+        self.maximum.reset();
+    }
+}
+
+impl Default for FastStochastic {
+    fn default() -> Self {
+        Self::new(14).unwrap()
+    }
+}
+
+impl fmt::Display for FastStochastic {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "FAST_STOCH({})", self.period)
+    }
+}
